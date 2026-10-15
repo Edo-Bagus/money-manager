@@ -62,6 +62,44 @@ npx supabase migration list      # pastikan kolom Local dan Remote sama
 butuh Docker). Pengaturan Auth project remote (misalnya sign-up dinonaktifkan)
 diatur di dashboard Supabase.
 
+### Setelah `db push`
+
+1. Jalankan blok-blok di `supabase/db-tests/verify-remote.sql` di Dashboard →
+   SQL Editor (hanya membaca). Hasil yang diharapkan tertulis di tiap blok:
+   owner tabel `postgres`, RLS aktif, `anon` tidak punya hak apa pun.
+2. Logout lalu login sekali. Login memanggil `ensure_default_accounts()`, yang
+   membuat kategori dan akun equity default (SPEC §5). Panggilan ini idempoten.
+   Kalau gagal, login tetap jalan dan error-nya ada di log Vercel.
+
+## Tes database
+
+`npm test` tidak menyentuh database. Migrasi, RLS, constraint, dan fungsi SQL
+dites terpisah dengan `npm run test:db`. Perintah ini membuat database sekali
+pakai di Postgres **lokal**, menjalankan semua migrasi, lalu
+`supabase/db-tests/*.test.sql`, dan menghapus database itu lagi. Seluruh suite
+jalan dua kali: dengan dan tanpa default grant Supabase untuk tabel baru
+(pengaturan "expose new tables" di project), supaya migrasi benar di kedua
+kondisi.
+
+Ini bukan Supabase asli: `supabase/db-tests/bootstrap.sql` meniru role `anon`,
+`authenticated`, `service_role`, `auth.users`, dan `auth.uid()`. Sisa celahnya
+ditutup oleh `verify-remote.sql` di atas.
+
+```bash
+# Postgres apa saja ≥ 16 dengan user yang boleh membuat database dan role,
+# misalnya lewat Docker:
+docker run -d --name mm-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:17
+
+PGPASSWORD=postgres npm run test:db     # host default: localhost
+PGPASSWORD=postgres npm run gen:types   # + tulis lib/supabase/database.types.ts
+```
+
+`run.sh` menolak `PGHOST` selain `localhost`/`127.0.0.1`/`::1`, jadi tidak
+mungkin berjalan ke project remote. `gen:types` butuh Docker karena Supabase CLI
+menjalankan postgres-meta di container. Tidak perlu akses ke project remote.
+Setelah mengubah migrasi, jalankan `gen:types` dan commit hasilnya. Job CI `db`
+gagal kalau tipe yang di-commit tertinggal dari migrasi.
+
 ## Ingest email
 
 `POST /api/ingest/email` tidak memakai sesi login. Endpoint ini meminta header
