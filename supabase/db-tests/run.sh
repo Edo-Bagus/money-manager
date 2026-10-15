@@ -65,8 +65,10 @@ run_suite() {
 
   if [[ -n "$types_out" && "$auto_expose" == true ]]; then
     echo "types    $types_out"
+    # sslmode=disable: the CLI insists on TLS otherwise, and a throwaway local
+    # Postgres (e.g. the postgres:17 image in CI) usually has none.
     npx --no-install supabase gen types typescript --schema public \
-      --db-url "postgresql://$PGUSER:${PGPASSWORD:-}@$PGHOST:$PGPORT/$db" >"$types_out.tmp"
+      --db-url "postgresql://$PGUSER:${PGPASSWORD:-}@$PGHOST:$PGPORT/$db?sslmode=disable" >"$types_out.tmp"
     mv "$types_out.tmp" "$types_out"
   fi
 
