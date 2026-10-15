@@ -97,6 +97,10 @@ begin
 end
 $$;
 
+-- Empty text and null mean the same in both functions: description is stored
+-- as '' (never null), notes as null (never ''). The generated TypeScript types
+-- cannot express nullable arguments, so the app may send either.
+
 -- Returns the new transaction's id.
 create function public.create_transaction(
   p_occurred_at timestamptz,
@@ -124,7 +128,7 @@ begin
   insert into public.transactions
     (occurred_at, description, notes, status, source, external_ref, source_key, tags)
   values
-    (p_occurred_at, coalesce(p_description, ''), p_notes, p_status, p_source,
+    (p_occurred_at, coalesce(p_description, ''), nullif(p_notes, ''), p_status, p_source,
      p_external_ref, p_source_key, coalesce(p_tags, '{}'))
   returning id into v_id;
 
@@ -160,7 +164,7 @@ begin
      set occurred_at = p_occurred_at,
          status = p_status,
          description = coalesce(p_description, ''),
-         notes = p_notes,
+         notes = nullif(p_notes, ''),
          tags = coalesce(p_tags, '{}')
    where id = p_id;
   if not found then
