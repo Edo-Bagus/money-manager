@@ -37,6 +37,8 @@ Batasan yang diketahui:
 
 - Supabase Auth, **satu pengguna**. **Sign-up publik dinonaktifkan.** Akun dibuat manual di dashboard.
 - **Row Level Security aktif di semua tabel.** Tidak ada tabel yang bisa dibaca oleh role `anon`.
+- **RLS per pemilik, bukan sekadar "sudah login".** Setiap tabel punya kolom `owner_id uuid not null default auth.uid()`, dan policy untuk `select`/`insert`/`update`/`delete` mensyaratkan `owner_id = auth.uid()`. Alasannya: publishable key memang publik, jadi akun lain (kalau sign-up pernah aktif tanpa sengaja) bisa memanggil API Supabase langsung tanpa melewati pengecekan `ALLOWED_EMAIL` di aplikasi.
+- Constraint unik selalu menyertakan `owner_id` (mis. `unique (owner_id, date)`), supaya baris milik akun lain tidak bisa memblokir data pemilik.
 - Endpoint ingest email (`POST /api/ingest/email`) memakai **shared secret** di header (`X-Ingest-Token`), bukan sesi login. Bandingkan dengan constant-time compare.
 - Hanya email yang **lolos DKIM untuk domain pengirim yang terdaftar** yang diparse. Selain itu: `parse_status = rejected`.
 - Secret hanya di environment variable (Vercel, Apps Script Properties, `.env.local`). **Tidak pernah di repo.**
@@ -48,6 +50,11 @@ Batasan yang diketahui:
 Double-entry sederhana. Setiap transaksi punya ≥2 posting yang jumlahnya **nol**.
 Konvensi tanda: **positif = aset/pengeluaran bertambah**, negatif = pemasukan/sumber dana.
 **Semua nominal dalam sen, tipe `bigint`.** Tidak boleh float.
+Di TypeScript, nominal sen bertipe `number` yang selalu bilangan bulat (dicek dengan `Number.isSafeInteger`), **bukan** `BigInt` JS: `BigInt` tidak bisa diserialisasi ke JSON, dan PostgREST mengembalikan `bigint` sebagai angka JSON. Batas amannya ±9×10¹⁵ sen (±90 triliun rupiah).
+
+**Zona waktu: `Asia/Jakarta` (WIB).** Waktu disimpan sebagai `timestamptz`. Semua konsep tanggal (hari ini, Tutup Hari, `check_date`, `day_closures.date`, laporan per bulan, peringatan duplikat ±1 hari) dihitung dalam WIB, tidak pernah memakai zona waktu server (Vercel berjalan di UTC).
+
+**Penulisan transaksi selalu atomik lewat fungsi Postgres (RPC).** Membuat, mengubah, atau menghapus transaksi beserta posting-nya dilakukan dalam satu fungsi (mis. `create_transaction`), bukan lewat insert/update terpisah dari aplikasi. Setiap request ke API Supabase adalah transaksi database tersendiri, sehingga constraint "jumlah posting = 0" yang deferred akan gagal kalau transaksi dan posting-nya dikirim terpisah.
 
 ### Tabel
 
@@ -82,7 +89,7 @@ Ada juga akun khusus `person` bernama **"Reimburse: <kegiatan>"** untuk biaya ya
 
 **balance_checks**: `account_id`, `check_date`, `expected_sen`, `actual_sen`, `diff_sen`, `resolution` (`ok | added_txn | fee_interest | carried_over`)
 
-**day_closures**: `date` (unik), `closed_at`
+**day_closures**: `date` (unik per `owner_id`), `closed_at`
 
 ### Kategori (akun `expense`)
 1. Makan & Minum
@@ -102,7 +109,9 @@ Ada juga akun khusus `person` bernama **"Reimburse: <kegiatan>"** untuk biaya ya
 ### Kategori (akun `income`)
 Uang Saku/Kiriman · Gaji/Honor · Hasil Investasi (bunga, kupon, dividen) · Lainnya
 
-`equity`: **Saldo Awal**, untuk mencatat saldo pembuka.
+`equity`:
+- **Saldo Awal**: untuk mencatat saldo pembuka.
+- **Penyesuaian Nilai Investasi**: akun lawan saat nilai investasi diperbarui (lihat §8). Karena bukan `income`/`expense`, akun ini tidak ikut laporan komposisi pengeluaran.
 
 ## 6. Jenis transaksi (template input manual)
 
@@ -113,9 +122,10 @@ Uang Saku/Kiriman · Gaji/Honor · Hasil Investasi (bunga, kupon, dividen) · La
 | Transfer antarakun sendiri | sumber −, tujuan + (+ biaya ke "Biaya Bank & Admin") |
 | Pinjamkan ke orang | sumber −, person + |
 | Dipinjami orang | tujuan +, person − |
+| **Dibayari orang** (orang lain membayar bagian saya) | kategori +, person − |
 | Terima pelunasan | tujuan +, person − |
 | Bayar utang | sumber −, person + |
-| **Patungan** | sumber − total; kategori + bagian sendiri; tiap person + bagiannya |
+| **Patungan** | sumber − total; kategori + bagian sendiri; tiap person + bagiannya. Sisa pembulatan sen masuk ke bagian sendiri. |
 | Ikhlaskan piutang | person −, "Hadiah & Donasi" + |
 | Biaya reimburse | sumber −, person "Reimburse: X" + |
 | Refund/cashback | akun +, kategori pengeluaran asal − |
@@ -161,7 +171,8 @@ Sumber lain (Jago, Seabank, e-wallet, investasi): **menunggu inventaris email**.
    - Bagian A: draft hari ini → konfirmasi / ubah kategori / pilih template.
    - Bagian B: akun yang perlu dicek = akun `daily_if_active` yang ada transaksinya hari ini + akun yang >7 hari tidak dicek. Tampilkan saldo menurut catatan, input saldo asli.
    - Selisih ≠ 0 → pilihan: **Tambah transaksi terlewat** (form terisi nominal selisih), **Biaya/bunga** (sekali klik), **Cek besok** (dibawa ke hari berikutnya).
-   - Tombol **Tutup hari**. Hari yang belum ditutup terlihat di dashboard.
+   - **Biaya/bunga**: selisih = saldo asli − saldo catatan. Selisih negatif → akun −, "Biaya Bank & Admin" +. Selisih positif → akun +, income "Hasil Investasi" −.
+   - Tombol **Tutup hari**. Hari yang belum ditutup terlihat di bagian atas halaman Tutup Hari (tidak ada halaman dashboard terpisah).
 3. **Input manual** (template §6)
 4. **Email belum dikenali**
 5. **Laporan**
@@ -169,7 +180,7 @@ Sumber lain (Jago, Seabank, e-wallet, investasi): **menunggu inventaris email**.
    - Daftar utang-piutang per orang: saldo, transaksi terakhir, umur piutang.
 6. **Pengaturan**: akun & identifiers, merchant rules, saldo awal.
 
-**Investasi** (`check_policy = monthly`): update nilai bulanan dicatat sebagai penyesuaian nilai, **bukan** pemasukan/pengeluaran.
+**Investasi** (`check_policy = monthly`): update nilai bulanan dicatat sebagai penyesuaian nilai, **bukan** pemasukan/pengeluaran. Posting: akun investasi ± selisih, equity "Penyesuaian Nilai Investasi" ∓ selisih. Bunga, kupon, dan dividen yang benar-benar diterima tetap dicatat sebagai income "Hasil Investasi".
 
 ## 9. Alur perbaikan via Claude Code
 
@@ -207,3 +218,20 @@ Berdasarkan hasil inventaris email. Opsional: parser fallback LLM untuk template
 - [ ] Inventaris email sumber lain (Jago, Seabank, GoPay, OVO, DANA, ShopeePay, Bibit, Ajaib, Tring): ada/tidak, jenis transaksi apa.
 - [ ] Bersedia/tidak mengirim isi email keuangan ke API LLM (Fase 3).
 - [ ] Rencana backup setelah Fase 1.
+
+Untuk Fase 2 (dari review Fase 0):
+- [ ] Jalur tulis ingest tanpa sesi login. Rekomendasi: Supabase secret key hanya di env Vercel (server-only), `owner_id` diisi eksplisit karena secret key melewati RLS.
+- [ ] `raw_emails` perlu menyimpan pesan RFC 822 utuh (untuk DKIM, "Proses ulang", "Unduh sebagai fixture"), bukan hanya `body_html`.
+- [ ] Verifikasi DKIM butuh library baru dan lookup DNS (bertentangan dengan test offline), kunci DKIM bisa dirotasi saat proses ulang, dan fixture yang dianonimkan pasti gagal DKIM. Alternatif: simpan `dkim_pass` sekali saat ingest, atau pakai header `Authentication-Results` dari Gmail.
+- [ ] Definisi `source_key`; perilaku unik `(external_ref, source_key)` saat bernilai NULL; kapan `parse_status = ignored`.
+- [ ] Batas ukuran: body request Vercel 4,5 MB (email berlampiran bisa lebih besar); database Supabase Free 500 MB.
+- [ ] Apps Script hanya memberi label `finance/sent` setelah respons 2xx; endpoint idempoten terhadap `gmail_message_id`.
+
+## 13. Riwayat keputusan
+
+**2026-10-15**, sebelum Fase 1:
+- §4: RLS per pemilik (`owner_id = auth.uid()`); constraint unik menyertakan `owner_id`.
+- §5: nominal di TypeScript = `number` bulat; zona waktu `Asia/Jakarta`; penulisan transaksi lewat fungsi Postgres (RPC); akun equity "Penyesuaian Nilai Investasi".
+- §6: template "Dibayari orang"; sisa pembulatan patungan masuk ke bagian sendiri.
+- §8: aturan tombol "Biaya/bunga"; posting penyesuaian nilai investasi; hari yang belum ditutup tampil di halaman Tutup Hari.
+- §12: pertanyaan Fase 2 dari review Fase 0 dicatat sebagai item terbuka.
