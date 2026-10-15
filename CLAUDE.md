@@ -53,7 +53,8 @@ Test diletakkan di samping file yang dites (`*.test.ts`).
 - **Zona waktu `Asia/Jakarta`** untuk semua konsep tanggal (hari ini, Tutup Hari, laporan
   bulanan, ±1 hari). Jangan pernah memakai zona waktu server.
 - **Transaksi + posting hanya ditulis lewat fungsi Postgres (RPC)**, supaya atomik. Jangan
-  insert/update posting langsung dari aplikasi.
+  insert/update posting langsung dari aplikasi. Perhitungan template → posting ada di
+  TypeScript murni (dites dengan Vitest); RPC hanya memvalidasi dan menyimpan.
 - **Nomor referensi (No. Referensi, BI Fast, dsb.) selalu string.** Jangan dikonversi ke
   angka: bisa alfanumerik, bisa diawali nol, bisa melebihi batas angka aman JS.
 - **Fixture wajib dianonimkan** sebelum masuk `fixtures/`: nama → `NAMA TES`, digit

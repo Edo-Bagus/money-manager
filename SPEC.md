@@ -55,6 +55,7 @@ Di TypeScript, nominal sen bertipe `number` yang selalu bilangan bulat (dicek de
 **Zona waktu: `Asia/Jakarta` (WIB).** Waktu disimpan sebagai `timestamptz`. Semua konsep tanggal (hari ini, Tutup Hari, `check_date`, `day_closures.date`, laporan per bulan, peringatan duplikat ±1 hari) dihitung dalam WIB, tidak pernah memakai zona waktu server (Vercel berjalan di UTC).
 
 **Penulisan transaksi selalu atomik lewat fungsi Postgres (RPC).** Membuat, mengubah, atau menghapus transaksi beserta posting-nya dilakukan dalam satu fungsi (mis. `create_transaction`), bukan lewat insert/update terpisah dari aplikasi. Setiap request ke API Supabase adalah transaksi database tersendiri, sehingga constraint "jumlah posting = 0" yang deferred akan gagal kalau transaksi dan posting-nya dikirim terpisah.
+Pembagian kerja: **perhitungan template → posting ada di TypeScript murni** (bisa dites dengan `npm test` tanpa Supabase); fungsi RPC hanya memvalidasi (jumlah = 0, akun milik pemilik) lalu menyimpan secara atomik.
 
 ### Tabel
 
@@ -231,7 +232,7 @@ Untuk Fase 2 (dari review Fase 0):
 
 **2026-10-15**, sebelum Fase 1:
 - §4: RLS per pemilik (`owner_id = auth.uid()`); constraint unik menyertakan `owner_id`.
-- §5: nominal di TypeScript = `number` bulat; zona waktu `Asia/Jakarta`; penulisan transaksi lewat fungsi Postgres (RPC); akun equity "Penyesuaian Nilai Investasi".
+- §5: nominal di TypeScript = `number` bulat; zona waktu `Asia/Jakarta`; penulisan transaksi lewat fungsi Postgres (RPC), dengan perhitungan posting di TypeScript murni; akun equity "Penyesuaian Nilai Investasi".
 - §6: template "Dibayari orang"; sisa pembulatan patungan masuk ke bagian sendiri.
 - §8: aturan tombol "Biaya/bunga"; posting penyesuaian nilai investasi; hari yang belum ditutup tampil di halaman Tutup Hari.
 - §12: pertanyaan Fase 2 dari review Fase 0 dicatat sebagai item terbuka.
