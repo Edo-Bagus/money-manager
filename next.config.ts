@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Cache Components / partial prefetching (create-next-app defaults) are
+  // left off: every page behind auth is per-request dynamic anyway.
+  poweredByHeader: false,
   turbopack: {
     rules: {
       "*.css": {
