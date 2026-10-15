@@ -21,6 +21,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
           autoComplete="username"
           inputMode="email"
           autoCapitalize="none"
+          defaultValue={state.email}
           required
           className={inputClass}
         />
