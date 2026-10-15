@@ -25,20 +25,24 @@ begin
         and data_type = 'uuid' and is_nullable = 'NO' and column_default = 'auth.uid()'
     ), format('%s: owner_id must be uuid not null default auth.uid()', t.relname);
 
-    -- One policy per command, for authenticated only, tied to auth.uid().
+    -- Exactly one policy per command, for authenticated only, and its condition
+    -- is exactly owner_id = auth.uid() (compared as deparsed text, so an extra
+    -- "or ..." fails). Policies are permissive and OR together, so any
+    -- additional policy would widen access; there must be no others.
     foreach v_cmd in array array['SELECT', 'INSERT', 'UPDATE', 'DELETE'] loop
       assert exists (
         select 1 from pg_policies p
         where p.schemaname = 'public' and p.tablename = t.relname and p.cmd = v_cmd
+          and p.permissive = 'PERMISSIVE'
           and p.roles = '{authenticated}'
-          and coalesce(p.qual, p.with_check) like '%owner_id = ( SELECT auth.uid()%'
-          and (v_cmd not in ('INSERT', 'UPDATE') or p.with_check like '%owner_id = ( SELECT auth.uid()%')
-      ), format('%s: missing owner policy for %s', t.relname, v_cmd);
+          and (v_cmd = 'INSERT' or p.qual = '(owner_id = ( SELECT auth.uid() AS uid))')
+          and (v_cmd in ('SELECT', 'DELETE') or p.with_check = '(owner_id = ( SELECT auth.uid() AS uid))')
+      ), format('%s: missing or wrong owner policy for %s', t.relname, v_cmd);
     end loop;
-    assert not exists (
-      select 1 from pg_policies p
-      where p.schemaname = 'public' and p.tablename = t.relname and p.cmd = 'ALL'
-    ), format('%s: FOR ALL policy; use one per command', t.relname);
+    assert (
+      select count(*) from pg_policies p
+      where p.schemaname = 'public' and p.tablename = t.relname
+    ) = 4, format('%s: expected exactly 4 policies', t.relname);
 
     -- Every unique index except the primary key includes owner_id.
     assert not exists (
