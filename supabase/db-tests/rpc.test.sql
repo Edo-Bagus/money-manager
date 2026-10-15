@@ -28,9 +28,12 @@ begin
     p_postings => '[
       {"account_id": "10000000-0000-4000-8000-0000000000a1", "amount_sen": -2500000},
       {"account_id": "10000000-0000-4000-8000-0000000000a2", "amount_sen": 2500000}
-    ]'
+    ]',
+    p_notes => ''
   );
   perform tests.run_deferred_checks();
+
+  assert (select notes from public.transactions where id = v_id) is null, 'empty notes stored as null';
 
   assert (select description from public.transactions where id = v_id) = '',
     'description defaults to empty';
@@ -237,6 +240,15 @@ begin
     'occurred_at updated';
   assert (select description from public.transactions where id = v_id) = '', 'null description stored as empty';
   assert (select notes from public.transactions where id = v_id) is null, 'notes cleared';
+
+  perform public.update_transaction(
+    v_id, '2026-10-15 13:00+07', 'confirmed', '[
+      {"account_id": "10000000-0000-4000-8000-0000000000a1", "amount_sen": -2500000},
+      {"account_id": "10000000-0000-4000-8000-0000000000a2", "amount_sen": 1250000},
+      {"account_id": "10000000-0000-4000-8000-0000000000a3", "amount_sen": 1250000}
+    ]', '', '', '{}');
+  perform tests.run_deferred_checks();
+  assert (select notes from public.transactions where id = v_id) is null, 'empty notes stored as null';
   assert (select tags from public.transactions where id = v_id) = '{}', 'null tags stored as empty';
   assert (select count(*) from public.postings where transaction_id = v_id) = 3, 'postings replaced';
   assert not exists (
