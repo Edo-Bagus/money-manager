@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAllowedEmail } from "@/lib/auth/allowed-email";
 import { getAllowedEmail, getSupabaseEnv } from "@/lib/env";
+import type { Database } from "@/lib/supabase/database.types";
 
 const LOGIN_PATH = "/login";
 
@@ -14,7 +15,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   let response = NextResponse.next({ request });
   const { url, publishableKey } = getSupabaseEnv();
 
-  const supabase = createServerClient(url, publishableKey, {
+  const supabase = createServerClient<Database>(url, publishableKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
