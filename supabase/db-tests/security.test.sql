@@ -80,8 +80,13 @@ begin
       assert not has_table_privilege('anon', r.oid, priv),
         format('anon has %s on %s', priv, r.relname);
     end loop;
-    -- TRUNCATE skips RLS; authenticated must not have it.
+    -- authenticated: plain DML (RLS picks the rows), granted explicitly so it
+    -- does not depend on the project's default grants. TRUNCATE skips RLS.
     if r.relkind in ('r', 'p') then
+      foreach priv in array array['SELECT', 'INSERT', 'UPDATE', 'DELETE'] loop
+        assert has_table_privilege('authenticated', r.oid, priv),
+          format('authenticated lacks %s on %s', priv, r.relname);
+      end loop;
       foreach priv in array array['TRUNCATE', 'REFERENCES', 'TRIGGER'] loop
         assert not has_table_privilege('authenticated', r.oid, priv),
           format('authenticated has %s on %s', priv, r.relname);
@@ -107,6 +112,8 @@ begin
   loop
     assert not has_function_privilege('anon', r.oid, 'EXECUTE'),
       format('anon can execute %s.%s', r.nspname, r.proname);
+    assert r.nspname <> 'public' or has_function_privilege('authenticated', r.oid, 'EXECUTE'),
+      format('authenticated cannot execute public.%s', r.proname);
     assert r.nspname <> 'public' or not r.prosecdef,
       format('public.%s is SECURITY DEFINER', r.proname);
     assert 'search_path=""' = any(coalesce(r.proconfig, '{}')),

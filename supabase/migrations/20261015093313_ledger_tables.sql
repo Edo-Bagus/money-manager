@@ -203,10 +203,16 @@ create policy day_closures_delete_own on public.day_closures
   for delete to authenticated using (owner_id = (select auth.uid()));
 
 -- Grants ----------------------------------------------------------------------
--- The default-privileges migration already keeps anon out of new tables; say
--- it again here so it does not depend on which role ran the migration.
--- TRUNCATE ignores RLS and authenticated never needs REFERENCES or TRIGGER.
+-- Explicit both ways, so nothing depends on default privileges: whether a new
+-- table is granted to the API roles automatically is a project setting
+-- (Data API, "expose new tables"), and the default-privileges migration only
+-- covers objects created by the role that ran it.
+-- authenticated gets plain DML; RLS decides which rows. TRUNCATE ignores RLS
+-- and authenticated never needs REFERENCES or TRIGGER.
 
+grant select, insert, update, delete on table
+  public.accounts, public.transactions, public.postings, public.balance_checks, public.day_closures
+  to authenticated;
 revoke all on table
   public.accounts, public.transactions, public.postings, public.balance_checks, public.day_closures
   from anon;

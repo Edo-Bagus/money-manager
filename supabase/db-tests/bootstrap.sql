@@ -4,9 +4,12 @@
 --
 -- It mirrors only what our migrations and tests depend on:
 -- - the API roles anon, authenticated and service_role;
--- - the default privileges Supabase gives those roles on schema public. These
---   matter: without them a table would be unreadable for lack of a grant, and
---   an RLS test could pass for the wrong reason;
+-- - when psql variable auto_expose is true, the default privileges Supabase
+--   gives those roles on schema public ("expose new tables" on, the cloud
+--   default). They matter: without them a table is unreadable for lack of a
+--   grant, and an anon or RLS test could pass for the wrong reason. run.sh
+--   runs every test with auto_expose true and again with false, so the
+--   migrations must work under either project setting;
 -- - auth.users (id only, plus email for readability) and auth.uid(), which
 --   reads the JWT claims the same way Supabase's does.
 --
@@ -29,12 +32,14 @@ $$;
 
 grant usage on schema public to anon, authenticated, service_role;
 
+\if :auto_expose
 alter default privileges for role postgres in schema public
   grant all on tables to anon, authenticated, service_role;
 alter default privileges for role postgres in schema public
   grant all on sequences to anon, authenticated, service_role;
 alter default privileges for role postgres in schema public
   grant all on functions to anon, authenticated, service_role;
+\endif
 
 create schema auth;
 grant usage on schema auth to anon, authenticated, service_role;
