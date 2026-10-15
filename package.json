@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:db": "bash supabase/db-tests/run.sh"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
