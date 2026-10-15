@@ -48,8 +48,12 @@ Test diletakkan di samping file yang dites (`*.test.ts`).
 ## Aturan wajib (dari SPEC)
 
 - **Nominal uang dalam sen, tipe `bigint` di Postgres** (kolom berakhiran `_sen`). Tidak boleh
-  float, `real`, `double precision`, atau `numeric`. Di kode, nominal selalu bilangan bulat
-  sen. Jangan pernah menghitung rupiah dengan desimal.
+  float, `real`, `double precision`, atau `numeric`. Di TypeScript, nominal adalah `number`
+  bulat (`Number.isSafeInteger`), bukan `BigInt`. Jangan pernah menghitung rupiah dengan desimal.
+- **Zona waktu `Asia/Jakarta`** untuk semua konsep tanggal (hari ini, Tutup Hari, laporan
+  bulanan, ±1 hari). Jangan pernah memakai zona waktu server.
+- **Transaksi + posting hanya ditulis lewat fungsi Postgres (RPC)**, supaya atomik. Jangan
+  insert/update posting langsung dari aplikasi.
 - **Nomor referensi (No. Referensi, BI Fast, dsb.) selalu string.** Jangan dikonversi ke
   angka: bisa alfanumerik, bisa diawali nol, bisa melebihi batas angka aman JS.
 - **Fixture wajib dianonimkan** sebelum masuk `fixtures/`: nama → `NAMA TES`, digit
@@ -57,9 +61,11 @@ Test diletakkan di samping file yang dites (`*.test.ts`).
   boleh dipertahankan. Email asli hanya boleh ada di `private/`.
 - **Semua perubahan skema lewat migrasi** di `supabase/migrations/`, tidak pernah lewat
   dashboard. Migrasi yang sudah di-push tidak boleh diubah; buat migrasi baru.
-- **Setiap tabel: `enable row level security` + policy eksplisit.** Role `anon` tidak boleh
-  bisa membaca tabel apa pun. Migrasi awal sudah mencabut default grant untuk `anon`; itu
-  lapisan tambahan, bukan pengganti RLS.
+- **Setiap tabel: `enable row level security`, kolom `owner_id uuid not null default auth.uid()`,
+  dan policy `owner_id = auth.uid()`** untuk select/insert/update/delete. `to authenticated` saja
+  tidak cukup. Constraint unik selalu menyertakan `owner_id`. Role `anon` tidak boleh bisa
+  membaca tabel apa pun. Migrasi awal sudah mencabut default grant untuk `anon`; itu lapisan
+  tambahan, bukan pengganti RLS. Setelah tabel baru di-push, cek bahwa owner-nya `postgres`.
 - **Jangan pernah commit secret.** Secret hanya di env var (`.env.local`, Vercel, Apps Script
   Properties). File `.env*` di-ignore kecuali `.env.example`, yang hanya berisi nama variabel
   tanpa nilai. Claude tidak memakai service-role key produksi dan tidak mengubah data lewat
