@@ -37,5 +37,14 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     return { error: NOT_ALLOWED_MESSAGE, email };
   }
 
+  // Creates the default categories and equity accounts on the first login and
+  // does nothing afterwards (SPEC §5; a migration has no auth.uid() to own
+  // them). Not fatal: login must keep working if this deploy reaches Vercel
+  // before the migration reaches Supabase. The next login retries.
+  const { error: seedError } = await supabase.rpc("ensure_default_accounts");
+  if (seedError) {
+    console.error("login: ensure_default_accounts failed", seedError.code, seedError.message);
+  }
+
   redirect("/");
 }
