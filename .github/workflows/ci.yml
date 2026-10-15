@@ -35,3 +35,49 @@ jobs:
 
       - name: Test
         run: npm test
+
+  db:
+    name: Database (migrations, RLS, RPC, types)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # A throwaway plain Postgres, same major version as the Supabase project
+    # (supabase/config.toml). supabase/db-tests/bootstrap.sql stands in for the
+    # Supabase roles and auth.uid(). Never a real Supabase project.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      # Password of the throwaway service container above, not a secret.
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # For the Supabase CLI (devDependency), used by gen:types.
+      - run: npm ci
+
+      - name: Apply migrations, run SQL tests, regenerate types
+        run: npm run gen:types
+
+      - name: Committed types match the migrations
+        run: |
+          git diff --exit-code -- lib/supabase/database.types.ts || {
+            echo "::error file=lib/supabase/database.types.ts::Out of date. Run npm run gen:types and commit the result."
+            exit 1
+          }
