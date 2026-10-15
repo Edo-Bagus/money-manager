@@ -13,7 +13,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:db": "bash supabase/db-tests/run.sh"
+    "test:db": "bash supabase/db-tests/run.sh",
+    "gen:types": "bash supabase/db-tests/run.sh --types lib/supabase/database.types.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
