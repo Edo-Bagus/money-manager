@@ -43,13 +43,23 @@ set local role anon;
 select count(*) from public.accounts;
 rollback;
 
--- 5. Functions. Expect: every public.* has security_definer = false; the three
---    private.* balance functions true, private.replace_postings false; every
---    row has config = {"search_path=\"\""} (search_path pinned to empty).
-select n.nspname, p.proname, p.prosecdef as security_definer, p.proconfig as config
+-- 5. Functions. Expect: owner = postgres on every row; every public.* has
+--    security_definer = false; the three private.* balance functions true,
+--    private.replace_postings false; every row has
+--    config = {"search_path=\"\""} (search_path pinned to empty).
+--    The owner matters: `supabase db push` connects through a temporary login
+--    role, and a SECURITY DEFINER function runs as its owner. Owned by anyone
+--    but postgres (the table owner), the balance check would be subject to
+--    RLS and might not see every posting.
+select n.nspname, p.proname, pg_get_userbyid(p.proowner) as owner,
+       p.prosecdef as security_definer, p.proconfig as config
 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname in ('public', 'private')
 order by 1, 2;
+
+-- Expect postgres.
+select pg_get_userbyid(nspowner) as private_schema_owner
+from pg_namespace where nspname = 'private';
 
 -- 6. After logging out and in once: the default accounts exist.
 --    Expect expense 13, income 4, equity 2 (per user; one user here).
