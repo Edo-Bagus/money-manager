@@ -66,7 +66,7 @@ diatur di dashboard Supabase.
 
 1. Jalankan blok-blok di `supabase/db-tests/verify-remote.sql` di Dashboard →
    SQL Editor (hanya membaca). Hasil yang diharapkan tertulis di tiap blok:
-   owner tabel `postgres`, RLS aktif, `anon` tidak punya hak apa pun.
+   owner tabel dan fungsi `postgres`, RLS aktif, `anon` tidak punya hak apa pun.
 2. Logout lalu login sekali. Login memanggil `ensure_default_accounts()`, yang
    membuat kategori dan akun equity default (SPEC §5). Panggilan ini idempoten.
    Kalau gagal, login tetap jalan dan error-nya ada di log Vercel.
