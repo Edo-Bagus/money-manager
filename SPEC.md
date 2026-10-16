@@ -138,7 +138,7 @@ Uang Saku/Kiriman · Gaji/Honor · Hasil Investasi (bunga, kupon, dividen) · La
 | **Dibayari orang** (orang lain membayar bagian saya) | kategori +, person − |
 | Terima pelunasan | tujuan +, person − |
 | Bayar utang | sumber −, person + |
-| **Patungan** | sumber − total; kategori + bagian sendiri; tiap person + bagiannya. Sisa pembulatan sen masuk ke bagian sendiri. |
+| **Patungan** | sumber − total; kategori + bagian sendiri; tiap person + bagiannya. Dibagi rata: bagian tiap orang dibulatkan ke bawah ke rupiah utuh, sisanya (termasuk sen) masuk ke bagian sendiri. Bagian per orang: bagian sendiri = total − bagian orang lain, boleh 0 (posting kategori tidak dibuat). |
 | Ikhlaskan piutang | person −, "Hadiah & Donasi" + |
 | Biaya reimburse | sumber −, person "Reimburse: X" + |
 | Refund/cashback | akun +, kategori pengeluaran asal − |
@@ -237,6 +237,9 @@ Berdasarkan hasil inventaris email. Opsional: parser fallback LLM untuk template
 Untuk Fase 1 (UI):
 - [ ] Saat menutup hari kemarin, saldo catatan dihitung sampai akhir tanggal itu atau sampai saat ini (saldo asli yang diinput adalah saldo saat ini).
 - [ ] Akun yang di-archive: database tidak menolak posting ke akun itu. Apakah form cukup menyembunyikannya?
+- [ ] Template tidak tersimpan di transaksi. Pinjamkan, Bayar utang, dan Biaya reimburse menghasilkan posting yang sama (asset −, person +), begitu juga Dipinjami dan Terima pelunasan, jadi form edit tidak bisa menebak template asal dari posting. Perlu kolom baru (migrasi) atau edit tanpa template?
+- [ ] Ikhlaskan piutang selalu ke "Hadiah & Donasi". Untuk sisa akun "Reimburse: X" yang tidak diganti, kategori aslinya (mis. Pendidikan, Perjalanan) mungkin lebih tepat. Perlu bisa memilih kategori?
+- [ ] Keypad desimal iPhone memakai `.` atau `,` tergantung region, sedangkan `parseRupiah` hanya menerima format Indonesia (`1234.56` ditolak). Pilih `inputmode` yang sesuai.
 
 Untuk Fase 2 (dari review Fase 0):
 - [ ] Jalur tulis ingest tanpa sesi login. Rekomendasi: Supabase secret key hanya di env Vercel (server-only), `owner_id` diisi eksplisit karena secret key melewati RLS. RPC transaksi yang ada mensyaratkan `auth.uid()`, jadi jalur ini butuh fungsi tersendiri.
@@ -261,3 +264,7 @@ Untuk Fase 2 (dari review Fase 0):
 - §5: `accounts.system_key`; `subtype` wajib untuk asset; `is_own` dicentang default di form akun asset; aturan ≥2 posting dan jumlah = 0 berlaku juga untuk draft (akun penampung untuk lawan yang belum diketahui); `external_ref`/`source_key` diisi berpasangan; isi `balance_checks` (selisih awal, satu cek per hari); akun default lewat `ensure_default_accounts()`; urutan tampil kategori.
 - §7: tujuan yang belum diketahui ke akun penampung, bukan kosong.
 - §8: saldo catatan hanya dari transaksi `confirmed`; aturan tanggal Tutup Hari; hari yang sudah ditutup tidak dikunci.
+
+**2026-10-16**, Fase 1 bagian 2 (mesin posting, tanggal WIB, rupiah):
+- §6: Patungan dibagi rata dibulatkan ke rupiah utuh (bukan sen), sisanya ke bagian sendiri; mode bagian per orang dengan bagian sendiri boleh 0.
+- §12: tiga pertanyaan untuk UI Fase 1 (template tidak tersimpan, kategori Ikhlaskan untuk akun Reimburse, keypad desimal iPhone).
