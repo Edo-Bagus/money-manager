@@ -38,6 +38,7 @@ begin
   assert (select description from public.transactions where id = v_id) = '',
     'description defaults to empty';
   assert (select tags from public.transactions where id = v_id) = '{}', 'tags default to empty';
+  assert (select template from public.transactions where id = v_id) is null, 'template defaults to null';
   assert (select owner_id from public.transactions where id = v_id) = '00000000-0000-4000-8000-00000000000a',
     'transaction belongs to the caller';
   assert (
@@ -62,9 +63,12 @@ begin
       {"account_id": "10000000-0000-4000-8000-0000000000a3", "amount_sen": 3000000},
       {"account_id": "10000000-0000-4000-8000-0000000000a3", "amount_sen": 3000000}
     ]',
-    'Makan malam', 'catatan', array['patungan'], '0012345678901234567890', 'mandiri:pembayaran'
+    'Makan malam', 'catatan', array['patungan'], '0012345678901234567890', 'mandiri:pembayaran',
+    'patungan'
   );
   perform tests.run_deferred_checks();
+
+  assert (select template from public.transactions where id = v_id) = 'patungan', 'template stored';
 
   assert (select external_ref from public.transactions where id = v_id) = '0012345678901234567890',
     'external_ref is stored as text, leading zeros and all';
@@ -189,6 +193,14 @@ select tests.assert_raises($q$
   ]', p_external_ref => '0012345678901234567890', p_source_key => 'mandiri:pembayaran')
 $q$, '23505');
 
+-- A template that is not one of SPEC §6.
+select tests.assert_raises($q$
+  select public.create_transaction(now(), 'confirmed', 'manual', '[
+    {"account_id": "10000000-0000-4000-8000-0000000000a1", "amount_sen": -100},
+    {"account_id": "10000000-0000-4000-8000-0000000000a2", "amount_sen": 100}
+  ]', p_template => 'hibah')
+$q$, '22P02', '%transaction_template%');
+
 -- Logged-in role but no user id in the claims.
 do $$
 begin
@@ -220,9 +232,10 @@ begin
     select public.update_transaction(%L, now(), 'confirmed', '[
       {"account_id": "10000000-0000-4000-8000-0000000000a1", "amount_sen": -1},
       {"account_id": "10000000-0000-4000-8000-0000000000a2", "amount_sen": 2}
-    ]', 'x', null, null)
+    ]', 'x', null, null, 'patungan')
   $q$, v_id), '23514');
   assert (select status from public.transactions where id = v_id) = 'draft', 'status unchanged';
+  assert (select template from public.transactions where id = v_id) is null, 'template unchanged';
   assert (select sum(abs(amount_sen)) from public.postings where transaction_id = v_id) = 5000000,
     'postings unchanged';
 
@@ -232,7 +245,7 @@ begin
       {"account_id": "10000000-0000-4000-8000-0000000000a1", "amount_sen": -2500000},
       {"account_id": "10000000-0000-4000-8000-0000000000a2", "amount_sen": 1250000},
       {"account_id": "10000000-0000-4000-8000-0000000000a3", "amount_sen": 1250000}
-    ]', null, null, null);
+    ]', null, null, null, 'patungan');
   perform tests.run_deferred_checks();
 
   assert (select status from public.transactions where id = v_id) = 'confirmed', 'status updated';
@@ -240,14 +253,16 @@ begin
     'occurred_at updated';
   assert (select description from public.transactions where id = v_id) = '', 'null description stored as empty';
   assert (select notes from public.transactions where id = v_id) is null, 'notes cleared';
+  assert (select template from public.transactions where id = v_id) = 'patungan', 'template set';
 
   perform public.update_transaction(
     v_id, '2026-10-15 13:00+07', 'confirmed', '[
       {"account_id": "10000000-0000-4000-8000-0000000000a1", "amount_sen": -2500000},
       {"account_id": "10000000-0000-4000-8000-0000000000a2", "amount_sen": 1250000},
       {"account_id": "10000000-0000-4000-8000-0000000000a3", "amount_sen": 1250000}
-    ]', '', '', '{}');
+    ]', '', '', '{}', null);
   perform tests.run_deferred_checks();
+  assert (select template from public.transactions where id = v_id) is null, 'template cleared';
   assert (select notes from public.transactions where id = v_id) is null, 'empty notes stored as null';
   assert (select tags from public.transactions where id = v_id) = '{}', 'null tags stored as empty';
   assert (select count(*) from public.postings where transaction_id = v_id) = 3, 'postings replaced';
@@ -255,13 +270,22 @@ begin
     select 1 from public.postings where transaction_id = v_id and amount_sen = 2500000
   ), 'old postings are gone';
 
+  -- p_template has no default in update_transaction: leaving it out must fail
+  -- rather than clear the template.
+  perform tests.assert_raises(format($q$
+    select public.update_transaction(%L, now(), 'confirmed', '[
+      {"account_id": "10000000-0000-4000-8000-0000000000a1", "amount_sen": -1},
+      {"account_id": "10000000-0000-4000-8000-0000000000a2", "amount_sen": 1}
+    ]', 'x', null, null)
+  $q$, v_id), '42883');
+
   -- B cannot update or delete A's transaction, and gets "not found".
   perform tests.login_as('00000000-0000-4000-8000-00000000000b');
   perform tests.assert_raises(format($q$
     select public.update_transaction(%L, now(), 'draft', '[
       {"account_id": "10000000-0000-4000-8000-0000000000b1", "amount_sen": -1},
       {"account_id": "10000000-0000-4000-8000-0000000000b1", "amount_sen": 1}
-    ]', 'hacked', null, null)
+    ]', 'hacked', null, null, null)
   $q$, v_id), 'P0002');
   perform tests.assert_raises(format('select public.delete_transaction(%L)', v_id), 'P0002');
 
@@ -291,13 +315,19 @@ select tests.logout();
 do $$
 begin
   assert has_function_privilege('authenticated',
-    'public.create_transaction(timestamptz, public.transaction_status, public.transaction_source, jsonb, text, text, text[], text, text)',
+    'public.create_transaction(timestamptz, public.transaction_status, public.transaction_source, jsonb, text, text, text[], text, text, public.transaction_template)',
     'EXECUTE'), 'authenticated can call create_transaction';
   assert has_function_privilege('authenticated',
-    'public.update_transaction(uuid, timestamptz, public.transaction_status, jsonb, text, text, text[])',
+    'public.update_transaction(uuid, timestamptz, public.transaction_status, jsonb, text, text, text[], public.transaction_template)',
     'EXECUTE'), 'authenticated can call update_transaction';
   assert has_function_privilege('authenticated', 'public.delete_transaction(uuid)', 'EXECUTE'),
     'authenticated can call delete_transaction';
+  -- PostgREST cannot pick between overloads; the old signatures must be gone.
+  assert (
+    select count(*) from pg_proc
+    where pronamespace = 'public'::regnamespace
+      and proname in ('create_transaction', 'update_transaction', 'delete_transaction')
+  ) = 3, 'exactly one function per RPC name';
 end
 $$;
 

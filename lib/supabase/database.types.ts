@@ -81,14 +81,14 @@ isOneToOne: false
                   ]
                 },"transactions": {
                   Row: {
-                    "created_at": string,"description": string,"external_ref": string | null,"id": string,"notes": string | null,"occurred_at": string,"owner_id": string,"source": Database["public"]['Enums']["transaction_source"],"source_key": string | null,"status": Database["public"]['Enums']["transaction_status"],"tags": (string)[]
+                    "created_at": string,"description": string,"external_ref": string | null,"id": string,"notes": string | null,"occurred_at": string,"owner_id": string,"source": Database["public"]['Enums']["transaction_source"],"source_key": string | null,"status": Database["public"]['Enums']["transaction_status"],"tags": (string)[],"template": Database["public"]['Enums']["transaction_template"] | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"description"?: string,"external_ref"?: string | null,"id"?: string,"notes"?: string | null,"occurred_at": string,"owner_id"?: string,"source": Database["public"]['Enums']["transaction_source"],"source_key"?: string | null,"status": Database["public"]['Enums']["transaction_status"],"tags"?: (string)[]
+                    "created_at"?: string,"description"?: string,"external_ref"?: string | null,"id"?: string,"notes"?: string | null,"occurred_at": string,"owner_id"?: string,"source": Database["public"]['Enums']["transaction_source"],"source_key"?: string | null,"status": Database["public"]['Enums']["transaction_status"],"tags"?: (string)[],"template"?: Database["public"]['Enums']["transaction_template"] | null
                   }
                   Update: {
-                    "created_at"?: string,"description"?: string,"external_ref"?: string | null,"id"?: string,"notes"?: string | null,"occurred_at"?: string,"owner_id"?: string,"source"?: Database["public"]['Enums']["transaction_source"],"source_key"?: string | null,"status"?: Database["public"]['Enums']["transaction_status"],"tags"?: (string)[]
+                    "created_at"?: string,"description"?: string,"external_ref"?: string | null,"id"?: string,"notes"?: string | null,"occurred_at"?: string,"owner_id"?: string,"source"?: Database["public"]['Enums']["transaction_source"],"source_key"?: string | null,"status"?: Database["public"]['Enums']["transaction_status"],"tags"?: (string)[],"template"?: Database["public"]['Enums']["transaction_template"] | null
                   }
                   Relationships: [
                     
@@ -100,7 +100,7 @@ isOneToOne: false
           }
           Functions: {
             "create_transaction":
-{ Args: { "p_description"?: string,"p_external_ref"?: string,"p_notes"?: string,"p_occurred_at": string,"p_postings": Json,"p_source": Database["public"]['Enums']["transaction_source"],"p_source_key"?: string,"p_status": Database["public"]['Enums']["transaction_status"],"p_tags"?: (string)[] }; Returns: string
+{ Args: { "p_description"?: string,"p_external_ref"?: string,"p_notes"?: string,"p_occurred_at": string,"p_postings": Json,"p_source": Database["public"]['Enums']["transaction_source"],"p_source_key"?: string,"p_status": Database["public"]['Enums']["transaction_status"],"p_tags"?: (string)[],"p_template"?: Database["public"]['Enums']["transaction_template"] }; Returns: string
                            },
 "delete_transaction":
 { Args: { "p_id": string }; Returns: undefined
@@ -109,11 +109,11 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: number
                            },
 "update_transaction":
-{ Args: { "p_description": string,"p_id": string,"p_notes": string,"p_occurred_at": string,"p_postings": Json,"p_status": Database["public"]['Enums']["transaction_status"],"p_tags": (string)[] }; Returns: undefined
+{ Args: { "p_description": string,"p_id": string,"p_notes": string,"p_occurred_at": string,"p_postings": Json,"p_status": Database["public"]['Enums']["transaction_status"],"p_tags": (string)[],"p_template": Database["public"]['Enums']["transaction_template"] }; Returns: undefined
                            }
           }
           Enums: {
-            "account_kind": "asset"|"person"|"expense"|"income"|"equity","asset_subtype": "bank"|"ewallet"|"investment"|"cash","balance_resolution": "ok"|"added_txn"|"fee_interest"|"carried_over","check_policy": "daily_if_active"|"monthly"|"never","transaction_source": "email"|"manual"|"reconcile","transaction_status": "draft"|"confirmed"
+            "account_kind": "asset"|"person"|"expense"|"income"|"equity","asset_subtype": "bank"|"ewallet"|"investment"|"cash","balance_resolution": "ok"|"added_txn"|"fee_interest"|"carried_over","check_policy": "daily_if_active"|"monthly"|"never","transaction_source": "email"|"manual"|"reconcile","transaction_status": "draft"|"confirmed","transaction_template": "pengeluaran"|"pemasukan"|"transfer"|"pinjamkan"|"dipinjami"|"dibayari"|"terima_pelunasan"|"bayar_utang"|"patungan"|"ikhlaskan_piutang"|"biaya_reimburse"|"refund"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -229,7 +229,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "account_kind": ["asset", "person", "expense", "income", "equity"],"asset_subtype": ["bank", "ewallet", "investment", "cash"],"balance_resolution": ["ok", "added_txn", "fee_interest", "carried_over"],"check_policy": ["daily_if_active", "monthly", "never"],"transaction_source": ["email", "manual", "reconcile"],"transaction_status": ["draft", "confirmed"]
+            "account_kind": ["asset", "person", "expense", "income", "equity"],"asset_subtype": ["bank", "ewallet", "investment", "cash"],"balance_resolution": ["ok", "added_txn", "fee_interest", "carried_over"],"check_policy": ["daily_if_active", "monthly", "never"],"transaction_source": ["email", "manual", "reconcile"],"transaction_status": ["draft", "confirmed"],"transaction_template": ["pengeluaran", "pemasukan", "transfer", "pinjamkan", "dipinjami", "dibayari", "terima_pelunasan", "bayar_utang", "patungan", "ikhlaskan_piutang", "biaya_reimburse", "refund"]
           }
         }
 } as const

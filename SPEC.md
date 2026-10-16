@@ -59,7 +59,7 @@ Di TypeScript, nominal sen bertipe `number` yang selalu bilangan bulat (dicek de
 
 **Penulisan transaksi selalu atomik lewat fungsi Postgres (RPC).** Membuat, mengubah, atau menghapus transaksi beserta posting-nya dilakukan dalam satu fungsi (mis. `create_transaction`), bukan lewat insert/update terpisah dari aplikasi. Setiap request ke API Supabase adalah transaksi database tersendiri, sehingga constraint "jumlah posting = 0" yang deferred akan gagal kalau transaksi dan posting-nya dikirim terpisah.
 Pembagian kerja: **perhitungan template → posting ada di TypeScript murni** (bisa dites dengan `npm test` tanpa Supabase); fungsi RPC hanya memvalidasi (jumlah = 0, akun milik pemilik) lalu menyimpan secara atomik.
-Fungsinya: `create_transaction`, `update_transaction` (mengganti tanggal, status, deskripsi, catatan, tag, dan semua posting; `source`/`external_ref`/`source_key` tetap), `delete_transaction`.
+Fungsinya: `create_transaction`, `update_transaction` (mengganti tanggal, status, deskripsi, catatan, tag, template, dan semua posting; `source`/`external_ref`/`source_key` tetap), `delete_transaction`.
 **Aturan "≥2 posting, jumlah = 0" berlaku juga untuk draft.** Draft yang lawan transaksinya belum diketahui (§7) memakai akun penampung, bukan dibiarkan tidak seimbang.
 
 ### Tabel
