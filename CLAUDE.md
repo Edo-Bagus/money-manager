@@ -5,7 +5,8 @@ sumber kebenaran proyek. Kalau kode, permintaan, dan SPEC saling bertentangan, t
 dulu. Jangan diam-diam memilih salah satu.
 
 Status: Fase 0 (setup) selesai. Fase 1 bagian 1 (skema, RLS, RPC transaksi, seed akun default)
-selesai; berikutnya UI Fase 1 (SPEC §11).
+dan bagian 2 (mesin posting 12 template, tanggal WIB, rupiah) selesai; berikutnya UI Fase 1
+(SPEC §11). Baca pertanyaan terbuka untuk UI di SPEC §12 dulu.
 
 ## Perintah
 
@@ -40,6 +41,10 @@ lib/
   supabase/               client server (server.ts), helper proxy (proxy.ts),
                           database.types.ts (hasil gen:types, jangan diedit tangan)
   security/               safeEqual (perbandingan constant-time)
+  money/rupiah.ts         parseRupiah / formatRupiah (teks ↔ sen, format Indonesia saja)
+  date/wib.ts             tanggal WIB: todayWib, wibDayRange, wibMonthRange, toOccurredAt, ...
+  posting/                templates.ts: buildPostings (template §6 → posting untuk RPC);
+                          posting.ts: tipe Posting/AccountRef, assertBalanced
   email/parsers/          satu file per template email (Fase 2)
   env.ts                  akses env var
 proxy.ts                  "middleware" versi Next 16: kunci semua route kecuali /login & /api/ingest/*
@@ -58,12 +63,14 @@ Test diletakkan di samping file yang dites (`*.test.ts`).
   float, `real`, `double precision`, atau `numeric`. Di TypeScript, nominal adalah `number`
   bulat (`Number.isSafeInteger`), bukan `BigInt`. Jangan pernah menghitung rupiah dengan desimal.
 - **Zona waktu `Asia/Jakarta`** untuk semua konsep tanggal (hari ini, Tutup Hari, laporan
-  bulanan, ±1 hari). Jangan pernah memakai zona waktu server.
+  bulanan, ±1 hari). Jangan pernah memakai zona waktu server. Pakai `lib/date/wib.ts`, jangan
+  `new Date().getDate()`/`toLocaleDateString()` dan sejenisnya.
 - **Transaksi + posting hanya ditulis lewat RPC** `create_transaction` / `update_transaction` /
   `delete_transaction`, supaya atomik. Jangan insert/update posting langsung dari aplikasi.
-  Perhitungan template → posting ada di TypeScript murni (dites dengan Vitest); RPC hanya
-  memvalidasi dan menyimpan. Trigger deferred menolak transaksi yang jumlah posting-nya ≠ 0
-  atau kurang dari 2 posting, **termasuk draft**.
+  Perhitungan template → posting ada di TypeScript murni (`buildPostings` di
+  `lib/posting/templates.ts`, dites dengan Vitest); RPC hanya memvalidasi dan menyimpan.
+  Trigger deferred menolak transaksi yang jumlah posting-nya ≠ 0 atau kurang dari 2 posting,
+  **termasuk draft**.
 - **Akun yang dicari oleh kode** (kategori default, equity) dicari lewat `accounts.system_key`
   (mis. `expense.biaya_bank_admin`), bukan lewat nama. Akun default dibuat oleh
   `ensure_default_accounts()` saat login.
