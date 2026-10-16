@@ -9,6 +9,9 @@
 import type { Enums } from "@/lib/supabase/database.types";
 import { assertBalanced, type AccountRef, type Posting } from "@/lib/posting/posting";
 
+/** A SPEC §6 template; also stored as transactions.template. */
+export type TemplateKind = Enums<"transaction_template">;
+
 /** The templates in SPEC §6 order, with the label the form shows. */
 export const TEMPLATE_LABELS = {
   pengeluaran: "Pengeluaran",
@@ -23,9 +26,7 @@ export const TEMPLATE_LABELS = {
   ikhlaskan_piutang: "Ikhlaskan piutang",
   biaya_reimburse: "Biaya reimburse",
   refund: "Refund/cashback",
-} as const;
-
-export type TemplateKind = keyof typeof TEMPLATE_LABELS;
+} as const satisfies Record<TemplateKind, string>;
 
 /** Accounts that builders require by role (seeded by ensure_default_accounts). */
 export const SYSTEM_KEYS = {

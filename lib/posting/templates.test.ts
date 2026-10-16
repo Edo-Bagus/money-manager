@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AccountRef } from "@/lib/posting/posting";
+import { Constants } from "@/lib/supabase/database.types";
 import {
   buildPostings,
   PATUNGAN_UNIT_SEN,
@@ -53,6 +54,10 @@ describe("TEMPLATE_LABELS", () => {
       "Biaya reimburse",
       "Refund/cashback",
     ]);
+  });
+
+  it("has exactly the values of transactions.template, in the same order", () => {
+    expect(Object.keys(TEMPLATE_LABELS)).toEqual(Constants.public.Enums.transaction_template);
   });
 });
 
