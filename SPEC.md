@@ -82,6 +82,7 @@ Ada juga akun khusus `person` bernama **"Reimburse: <kegiatan>"** untuk biaya ya
 - `source`: `email | manual | reconcile`
 - `external_ref` (string) + `source_key`; unik bersama (per pemilik) untuk mencegah duplikat. Diisi berpasangan atau kosong berdua; transaksi manual mengosongkan keduanya, dan NULL tidak saling bentrok.
 - `raw_email_id` (nullable), `tags text[]`
+- `template` (nullable): template §6 yang dipakai, supaya form edit membuka template yang sama. Posting saja tidak cukup: Pinjamkan, Bayar utang, dan Biaya reimburse menghasilkan posting yang sama (asset −, person +), begitu juga Dipinjami dan Terima pelunasan. Kosong kalau transaksi tidak dibuat dari template §6 (draft email yang belum dipilihkan template, Biaya/bunga, saldo awal). Ditulis lewat RPC dan bisa diganti lewat `update_transaction` (mis. saat memilih template untuk draft).
 
 **postings**
 - `id`, `transaction_id`, `account_id`, `amount_sen bigint`
@@ -184,7 +185,7 @@ Sumber lain (Jago, Seabank, e-wallet, investasi): **menunggu inventaris email**.
    - Tanggal yang ditutup dipilih dari daftar hari yang belum ditutup. Default: hari ini (WIB); sebelum pukul 03.00 WIB dan kemarin belum ditutup → kemarin. Hari yang sudah ditutup **tidak dikunci**; mengubah transaksi pada tanggal itu menampilkan peringatan.
    - Bagian A: draft pada tanggal yang ditutup → konfirmasi / ubah kategori / pilih template.
    - Bagian B: akun yang perlu dicek = akun `daily_if_active` yang ada transaksinya pada tanggal yang ditutup + akun yang >7 hari tidak dicek. Tampilkan saldo menurut catatan, input saldo asli.
-   - **Saldo menurut catatan** hanya menghitung transaksi `confirmed`. Kalau akun itu masih punya draft, tampilkan peringatan.
+   - **Saldo menurut catatan** hanya menghitung transaksi `confirmed`, dan dihitung **sampai saat ini** (`occurred_at` ≤ sekarang), bukan sampai akhir tanggal yang ditutup: saldo asli yang diinput adalah saldo sekarang di aplikasi bank, jadi transaksi setelah tanggal itu (mis. lewat tengah malam saat menutup kemarin) ikut dihitung. Kalau akun itu masih punya draft, tampilkan peringatan.
    - Selisih ≠ 0 → pilihan: **Tambah transaksi terlewat** (form terisi nominal selisih), **Biaya/bunga** (sekali klik), **Cek besok** (dibawa ke hari berikutnya).
    - **Biaya/bunga**: selisih = saldo asli − saldo catatan. Selisih negatif → akun −, "Biaya Bank & Admin" +. Selisih positif → akun +, income "Hasil Investasi" −.
    - Tombol **Tutup hari**. Hari yang belum ditutup terlihat di bagian atas halaman Tutup Hari (tidak ada halaman dashboard terpisah).
@@ -221,6 +222,7 @@ Repo, Next.js, Supabase project, Vercel, auth satu pengguna, RLS, CLAUDE.md.
 **Fase 1: Bisa dipakai tanpa otomasi**
 Skema, akun & saldo awal, input manual semua template, Tutup Hari, laporan, export JSON.
 *Selesai jika:* dipakai 14 malam, Tutup Hari selesai ≥12 malam.
+Urutan UI: Pengaturan akun + saldo awal → Export JSON → Input manual → Tutup Hari → Laporan. Export JSON dibuat sebelum data asli masuk karena Supabase Free tidak punya backup (§10). Empat yang pertama dibutuhkan untuk mulai menghitung 14 malam; laporan boleh menyusul selama itu.
 
 **Fase 2: Email Mandiri**
 Apps Script forwarder, endpoint ingest, DKIM, 3 parser Mandiri + fixture + test, merchant rules, halaman email belum dikenali, fixture export.
@@ -235,9 +237,7 @@ Berdasarkan hasil inventaris email. Opsional: parser fallback LLM untuk template
 - [ ] Rencana backup setelah Fase 1.
 
 Untuk Fase 1 (UI):
-- [ ] Saat menutup hari kemarin, saldo catatan dihitung sampai akhir tanggal itu atau sampai saat ini (saldo asli yang diinput adalah saldo saat ini).
 - [ ] Akun yang di-archive: database tidak menolak posting ke akun itu. Apakah form cukup menyembunyikannya?
-- [ ] Template tidak tersimpan di transaksi. Pinjamkan, Bayar utang, dan Biaya reimburse menghasilkan posting yang sama (asset −, person +), begitu juga Dipinjami dan Terima pelunasan, jadi form edit tidak bisa menebak template asal dari posting. Perlu kolom baru (migrasi) atau edit tanpa template?
 - [ ] Ikhlaskan piutang selalu ke "Hadiah & Donasi". Untuk sisa akun "Reimburse: X" yang tidak diganti, kategori aslinya (mis. Pendidikan, Perjalanan) mungkin lebih tepat. Perlu bisa memilih kategori?
 - [ ] Keypad desimal iPhone memakai `.` atau `,` tergantung region, sedangkan `parseRupiah` hanya menerima format Indonesia (`1234.56` ditolak). Pilih `inputmode` yang sesuai.
 
@@ -268,3 +268,9 @@ Untuk Fase 2 (dari review Fase 0):
 **2026-10-16**, Fase 1 bagian 2 (mesin posting, tanggal WIB, rupiah):
 - §6: Patungan dibagi rata dibulatkan ke rupiah utuh (bukan sen), sisanya ke bagian sendiri; mode bagian per orang dengan bagian sendiri boleh 0.
 - §12: tiga pertanyaan untuk UI Fase 1 (template tidak tersimpan, kategori Ikhlaskan untuk akun Reimburse, keypad desimal iPhone).
+
+**2026-10-16**, sebelum UI Fase 1:
+- §5: kolom `transactions.template` (nullable), ditulis lewat RPC, supaya form edit tahu template asal.
+- §8: saldo catatan di Tutup Hari dihitung sampai saat ini, bukan sampai akhir tanggal yang ditutup.
+- §11: urutan UI Fase 1, Export JSON dimajukan sebelum data asli masuk.
+- §12: pertanyaan soal batas waktu saldo catatan dan soal template yang tidak tersimpan ditutup.
